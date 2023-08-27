@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 import sqlite3 as sq
 import time
+import datetime
 
 class ArrlSessionCount:
     STATES_DICT = {'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'DC': 'District Of Columbia', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming', 'AS': 'American Samoa', 'AE': 'Armed Forces - Europe', 'AP': 'Armed Forces - Pacific', 'AA': 'Armed Forces - USA/Canada', 'FM': 'Federated States of Micronesia', 'GU': 'Guam', 'MH': 'Marshall Islands', 'MP': 'Northern Mariana Islands', 'PW': 'Palau', 'VI': 'Virgin Islands', 'Non-US': 'Non-US'}
@@ -86,8 +87,11 @@ class ArrlSessionCount:
         self.conn.close()
 
     def sync(self):
+        dt = datetime.datetime.now()
+        with open(ArrlSessionCount.LOG_PATH, 'a') as file:
+            file.write(f"Sync in progress {dt.strftime('%c')}\n")
         for key in ArrlSessionCount.STATES_DICT:
-            r = requests.get((ArrlSessionCount.ARRL_URL+f"?state={key}"))
+            r = requests.get((ArrlSessionCount.ARRL_URL+f"?state={key}\n"))
             doc = BeautifulSoup(r.content, 'html.parser')
             try:
                 table = doc.table.find_all('tr')
@@ -108,9 +112,9 @@ class ArrlSessionCount:
                             WHERE callSign = ?
                             ''', (ve_info[1], ve_info[2], ve_info[3], ve_info[4], ve_info[5], ve_info[0]))
                             with open(ArrlSessionCount.LOG_PATH, 'a') as file:
-                                file.write("VE Updated!")
-                                file.write(existing_record)
-                                file.write(ve_info)
+                                file.write("VE Updated\n")
+                                file.write(existing_record + '\n')
+                                file.write(ve_info + '\n')
                     else:
                         self.cursor.execute(f'''INSERT INTO ve_session_counts VALUES(
                         "{ve_info[0]}",
@@ -122,11 +126,11 @@ class ArrlSessionCount:
                     )
                     ''')
             with open(ArrlSessionCount.LOG_PATH, 'a') as file:
-                file.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]}!")
+                file.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]}\n")
             time.sleep(60)
         self.conn.close()
         with open(ArrlSessionCount.LOG_PATH, 'a') as file:
-            file.write("VE Stats Fetched!")
+            file.write("VE Stats Fetched!\n\n")
 
     def get_ve_stats(self, call_sign : str):
         call_sign = call_sign.upper()
