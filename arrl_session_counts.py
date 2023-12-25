@@ -11,7 +11,7 @@ class ArrlSessionCount:
     LOG_PATH = '../ve-database/log.txt'
 
     # Extract ve data from a row
-    def __scrape(self, row, state):
+    def __extract(self, row, state):
         ve_info ={
             'callSign' : None,
             'name' : None,
@@ -47,6 +47,7 @@ class ArrlSessionCount:
         #Initiates a database table if one doesn't exist
         self.conn = sq.connect(ArrlSessionCount.DATABASE_PATH)
         self.cursor = self.conn.cursor()
+        # checks if the database exists
         try:
             self.cursor.execute('''CREATE TABLE ve_session_counts(
                 callSign TEXT,
@@ -70,7 +71,7 @@ class ArrlSessionCount:
                 continue
             table.pop(0) #removes the headers
             for row in table:
-                ve_info = self.__scrape(row, ArrlSessionCount.STATES_DICT[key])
+                ve_info = self.__extract(row, ArrlSessionCount.STATES_DICT[key])
                 #Inserts into database
                 with self.conn:
                     print(ve_info['callSign'], " ", ve_info['state'])
@@ -94,12 +95,12 @@ class ArrlSessionCount:
             r = requests.get((ArrlSessionCount.ARRL_URL+f"?state={key}"))
             doc = BeautifulSoup(r.content, 'html.parser')
             try:
-                table = doc.table.find_all('tr')
+                table = doc.find("table", id="sc_table").find_all("tr")
             except AttributeError:
                 continue
             table.pop(0) #removes the headers
             for row in table:
-                ve_info = self.__scrape(row, ArrlSessionCount.STATES_DICT[key])
+                ve_info = self.__extract(row, ArrlSessionCount.STATES_DICT[key])
                 ve_info = tuple(value for value in ve_info.values())
                 print(ve_info[0], ve_info[1])
                 with self.conn:
