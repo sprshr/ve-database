@@ -2,13 +2,14 @@ from bs4 import BeautifulSoup
 import requests
 import sqlite3 as sq
 import time
-import datetime
-
+from datetime import datetime
+from pathlib import Path
+# print(Path.cwd().joinpath("ve_session_counts.db"))
 class ArrlSessionCount:
     STATES_DICT = {'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'DC': 'District Of Columbia', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming', 'AS': 'American Samoa', 'AE': 'Armed Forces - Europe', 'AP': 'Armed Forces - Pacific', 'AA': 'Armed Forces - USA/Canada', 'FM': 'Federated States of Micronesia', 'GU': 'Guam', 'MH': 'Marshall Islands', 'MP': 'Northern Mariana Islands', 'PW': 'Palau', 'VI': 'Virgin Islands', 'Non-US': 'Non-US'}
     ARRL_URL = "http://www.arrl.org/ve-session-counts"
-    DATABASE_PATH = '../ve-database/ve_session_counts.db'
-    LOG_PATH = '../ve-database/log.txt'
+    DATABASE_PATH = Path("ve_session_counts.db")
+    LOG_PATH = Path("log")
 
     # Extract ve data from a row
     def __extract(self, row, state):
@@ -45,6 +46,7 @@ class ArrlSessionCount:
         #     else:
         #         ArrlSessionCount.STATES_DICT[option['value']] = option.string
         #Initiates a database table if one doesn't exist
+        ArrlSessionCount.LOG_PATH.mkdir(exist_ok=True)
         self.conn = sq.connect(ArrlSessionCount.DATABASE_PATH)
         self.cursor = self.conn.cursor()
         # checks if the database exists
@@ -66,7 +68,7 @@ class ArrlSessionCount:
             r = requests.get((ArrlSessionCount.ARRL_URL+f"?state={key}"))
             doc = BeautifulSoup(r.content, 'html.parser')
             try:
-                table = doc.table.find_all('tr')
+                table = doc.find("table", id="sc_table").find_all('tr')
             except AttributeError:
                 continue
             table.pop(0) #removes the headers
@@ -88,9 +90,10 @@ class ArrlSessionCount:
         self.conn.close()
 
     def sync(self):
-        dt = datetime.datetime.now()
-        with open(ArrlSessionCount.LOG_PATH, 'a') as file:
-            file.write(f"Sync in progress {dt.strftime('%c')}\n")
+        dt = datetime.now()
+        syncLogPath = ArrlSessionCount.LOG_PATH.joinpath(dt.strftime('%b_%d_%Y_log.txt'))
+        with open(syncLogPath, 'a') as log:
+            log.write(f"Sync in progress {dt.strftime('%c')}\n")
         for key in ArrlSessionCount.STATES_DICT:
             r = requests.get((ArrlSessionCount.ARRL_URL+f"?state={key}"))
             doc = BeautifulSoup(r.content, 'html.parser')
@@ -112,10 +115,10 @@ class ArrlSessionCount:
                             SET name = ?, state = ?, county = ?, accreditation = ?, sessions = ?
                             WHERE callSign = ?
                             ''', (ve_info[1], ve_info[2], ve_info[3], ve_info[4], ve_info[5], ve_info[0]))
-                            with open(ArrlSessionCount.LOG_PATH, 'a') as file:
-                                file.write("VE Updated\n")
-                                file.write(f"{existing_record}\n")
-                                file.write(f"{ve_info}\n")
+                            with open(syncLogPath, 'a') as log:
+                                log.write("VE Updated\n")
+                                log.write(f"{existing_record}\n")
+                                log.write(f"{ve_info}\n")
                     else:
                         self.cursor.execute(f'''INSERT INTO ve_session_counts VALUES(
                         "{ve_info[0]}",
@@ -126,21 +129,25 @@ class ArrlSessionCount:
                         "{ve_info[5]}"
                     )
                     ''')
-            with open(ArrlSessionCount.LOG_PATH, 'a') as file:
-                file.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]}\n")
+                    with open(syncLogPath, 'a') as log:
+                        log.write("VE Added\n")
+                        log.write(f"{ve_info}\n")
+            with open(syncLogPath, 'a') as log:
+                dt = datetime.now()
+                log.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]} {dt.strftime('%X')}\n")
             time.sleep(60)
         self.conn.close()
-        with open(ArrlSessionCount.LOG_PATH, 'a') as file:
-            file.write("VE Stats Fetched!\n\n")
+        with open(syncLogPath, 'a') as log:
+            dt = datetime.now()
+            log.write(f"VE Stats Fetched! {dt.strftime('%X')}\n")
 
-    def get_ve_stats(self, call_sign : str):
+    def get_ve_stats(self, call_sign:str):
         call_sign = call_sign.upper()
         result = None
         with self.conn:
             self.cursor.execute('''SELECT * FROM ve_session_counts WHERE callSign = ?''', (call_sign,))
             result = self.cursor.fetchone()
         if result is not None:
-            print(result)
             return result
         else:
             return None
