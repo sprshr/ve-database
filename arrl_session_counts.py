@@ -4,12 +4,14 @@ import sqlite3 as sq
 import time
 from datetime import datetime
 from pathlib import Path
+import os
 
 class ArrlSessionCount:
     STATES_DICT = {'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'DC': 'District Of Columbia', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming', 'AS': 'American Samoa', 'AE': 'Armed Forces - Europe', 'AP': 'Armed Forces - Pacific', 'AA': 'Armed Forces - USA/Canada', 'FM': 'Federated States of Micronesia', 'GU': 'Guam', 'MH': 'Marshall Islands', 'MP': 'Northern Mariana Islands', 'PW': 'Palau', 'VI': 'Virgin Islands', 'Non-US': 'Non-US'}
     ARRL_URL = "http://www.arrl.org/ve-session-counts"
-    DATABASE_PATH = Path("ve_session_counts.db")
-    LOG_PATH = Path("log")
+    DATABASE_PATH = Path(__file__).parent.joinpath("ve_session_counts.db")
+    LOG_PATH = Path(__file__).parent.joinpath("log")
+    LAST_UPDATED_PATH = Path(__file__).parent.joinpath("last_updated.txt")
 
     # Extract ve data from a row
     def __extract(self, row, state):
@@ -35,6 +37,12 @@ class ArrlSessionCount:
         for key in ve_info:
             ve_info[key] = str(ve_info[key])
         return ve_info
+    
+    #updates the timestamp in the 'last updated' file
+    def __update(self):
+        dt = datetime.now()
+        with open(ArrlSessionCount.LAST_UPDATED_PATH, 'w') as last_updated:
+            last_updated.write(str(int(dt.timestamp())))
 
     def __init__(self):
         # Gets a list of states available on the arrl ve session coutns page
@@ -65,7 +73,7 @@ class ArrlSessionCount:
             return
         #creates the log file
         dt = datetime.now()
-        logFilePath = ArrlSessionCount.LOG_PATH.joinpath(dt.strftime('%b_%d_%Y_log.txt'))
+        logFilePath = ArrlSessionCount.LOG_PATH.joinpath(dt.strftime('%b_%d_%Y.log'))
         #gets all the ve info for every state and stores it to the database
         for key in ArrlSessionCount.STATES_DICT:
             r = requests.get((ArrlSessionCount.ARRL_URL+f"?state={key}"))
@@ -88,21 +96,23 @@ class ArrlSessionCount:
                         "{ve_info['sessions']}"
                     )
                     ''')
-                with open(logFilePath, 'a'):
+                with open(logFilePath, 'a') as log:
                     log.write("VE Added\n")
                     log.write(f"{ve_info}\n")
-            time.sleep(60)
             with open(logFilePath, 'a') as log:
                 dt = datetime.now()
                 log.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]} {dt.strftime('%X')}\n")
+            time.sleep(60)
         self.conn.close()
         with open(logFilePath, 'a') as log:
             dt = datetime.now()
             log.write(f"VE Stats Fetched! {dt.strftime('%X')}\n")
+        self.__update()
+
 
     def sync(self):
         dt = datetime.now()
-        logFilePath = ArrlSessionCount.LOG_PATH.joinpath(dt.strftime('%b_%d_%Y_log.txt'))
+        logFilePath = ArrlSessionCount.LOG_PATH.joinpath(dt.strftime('%b_%d_%Y.log'))
         with open(logFilePath, 'a') as log:
             log.write(f"Sync in progress {dt.strftime('%c')}\n")
         for key in ArrlSessionCount.STATES_DICT:
@@ -150,6 +160,7 @@ class ArrlSessionCount:
         with open(logFilePath, 'a') as log:
             dt = datetime.now()
             log.write(f"VE Stats Fetched! {dt.strftime('%X')}\n")
+        self.__update()
 
     def get_ve_stats(self, call_sign:str):
         call_sign = call_sign.upper()
@@ -161,7 +172,14 @@ class ArrlSessionCount:
             return result
         else:
             return None
+    
+    def get_last_update(self):
+        return open(ArrlSessionCount.LAST_UPDATED_PATH, 'r').read()
 
 if __name__ == '__main__':
     arrl = ArrlSessionCount()
-    arrl.sync()
+    #checks if it's been more than 24 hours since last update
+    lastUpdate = int(arrl.get_last_update())
+    dt = datetime.now()
+    if abs(dt.timestamp-lastUpdate) > 24 * 3600:
+        arrl.sync()
