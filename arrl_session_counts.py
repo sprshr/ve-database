@@ -181,5 +181,5 @@ if __name__ == '__main__':
     #checks if it's been more than 24 hours since last update
     lastUpdate = int(arrl.get_last_update())
     dt = datetime.now()
-    if abs(dt.timestamp-lastUpdate) > 24 * 3600:
+    if abs(dt.timestamp-lastUpdate+120) > 24 * 3600:
         arrl.sync()
