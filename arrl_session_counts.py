@@ -149,9 +149,9 @@ class ArrlSessionCount:
                         "{ve_info[5]}"
                     )
                     ''')
-                    with open(logFilePath, 'a') as log:
-                        log.write("VE Added\n")
-                        log.write(f"{ve_info}\n")
+                        with open(logFilePath, 'a') as log:
+                            log.write("VE Added\n")
+                            log.write(f"{ve_info}\n")
             with open(logFilePath, 'a') as log:
                 dt = datetime.now()
                 log.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]} {dt.strftime('%X')}\n")
