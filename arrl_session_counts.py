@@ -177,9 +177,8 @@ class ArrlSessionCount:
         return open(ArrlSessionCount.LAST_UPDATED_PATH, 'r').read()
 
 if __name__ == '__main__':
-    arrl = ArrlSessionCount()
-    #checks if it's been more than 24 hours since last update
-    lastUpdate = int(arrl.get_last_update())
-    dt = datetime.now()
-    if abs(dt.timestamp-lastUpdate+120) > 24 * 3600:
+    if ArrlSessionCount.DATABASE_PATH.is_file():
+        arrl = ArrlSessionCount()
         arrl.sync()
+    else:
+        arrl = ArrlSessionCount()
