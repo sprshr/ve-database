@@ -102,7 +102,7 @@ class ArrlSessionCount:
             with open(logFilePath, 'a') as log:
                 dt = datetime.now()
                 log.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]} {dt.strftime('%X')}\n")
-            time.sleep(60)
+            time.sleep(120)
         self.conn.close()
         with open(logFilePath, 'a') as log:
             dt = datetime.now()
@@ -155,7 +155,7 @@ class ArrlSessionCount:
             with open(logFilePath, 'a') as log:
                 dt = datetime.now()
                 log.write(f"Fetched {ArrlSessionCount.STATES_DICT[key]} {dt.strftime('%X')}\n")
-            time.sleep(60)
+            time.sleep(120)
         self.conn.close()
         with open(logFilePath, 'a') as log:
             dt = datetime.now()
